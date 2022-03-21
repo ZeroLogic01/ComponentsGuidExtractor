@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Text.Json;
 
 namespace CompStringToGuidConverter
 {
@@ -21,18 +22,31 @@ namespace CompStringToGuidConverter
                 "msstdfmt.dll",
                 "tabctl32.ocx",
                 "Tlbinf32.dll",
-                "UnRAR.dll"
+                "UnRAR.dll",
+                "vsjitdebuggerps.dll"
             };
 
             string componentsRoot = @"SOFTWARE\Microsoft\Windows\CurrentVersion\Installer\UserData\S-1-5-18\Components";
 
-
-            var result = ComponentGuidFinder.FindComponentGuids(componentsRoot, filesList, 
+            Console.WriteLine("Reading components registry...");
+            var extractedComponentsGuidDictionary = ComponentGuidFinder.FindComponentGuids(componentsRoot, filesList,
                 ComponentsGuidExtractor.ClassLibrary.Enums.SearchType.FileName);
+            Console.WriteLine("Read components registry.");
+            if (extractedComponentsGuidDictionary?.Count > 0)
+            {
+                string outputFileName = @"Extracted Components Guids.json";
+                
+                Console.WriteLine($"Writing to file '{outputFileName}'...");
 
-            // to-do: export result to a text or a json file
-
-            Console.ReadLine();
+                File.WriteAllText(outputFileName, JsonSerializer.Serialize(extractedComponentsGuidDictionary
+                    , new JsonSerializerOptions { WriteIndented = true }));
+                
+                Console.WriteLine($"Components Guid written to file '{outputFileName}' successfully.");
+            }
+            else
+            {
+                Console.WriteLine("No Component Guid found.");
+            }
         }
     }
 }
