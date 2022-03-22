@@ -26,21 +26,20 @@ namespace CompStringToGuidConverter
                 "vsjitdebuggerps.dll"
             };
 
-            string componentsRoot = @"SOFTWARE\Microsoft\Windows\CurrentVersion\Installer\UserData\S-1-5-18\Components";
-
             Console.WriteLine("Reading components registry...");
-            var extractedComponentsGuidDictionary = ComponentGuidFinder.FindComponentGuids(componentsRoot, filesList,
+            var extractedComponentsGuidDictionary = ComponentGuidFinder.FindComponentGuids(filesList,
                 ComponentsGuidExtractor.ClassLibrary.Enums.SearchType.FileName);
             Console.WriteLine("Read components registry.");
-            if (extractedComponentsGuidDictionary?.Count > 0)
+
+            if (extractedComponentsGuidDictionary != null && extractedComponentsGuidDictionary.Count > 0)
             {
                 string outputFileName = @"Extracted Components Guids.json";
                 
                 Console.WriteLine($"Writing to file '{outputFileName}'...");
 
-                File.WriteAllText(outputFileName, JsonSerializer.Serialize(extractedComponentsGuidDictionary
-                    , new JsonSerializerOptions { WriteIndented = true }));
-                
+                File.WriteAllText(outputFileName, JsonSerializer.Serialize(extractedComponentsGuidDictionary,
+                    new JsonSerializerOptions { WriteIndented = true }));
+
                 Console.WriteLine($"Components Guid written to file '{outputFileName}' successfully.");
             }
             else

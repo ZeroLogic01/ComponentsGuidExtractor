@@ -21,6 +21,6 @@ namespace ComponentsGuidExtractor.ClassLibrary.Models
         /// <summary>
         /// Product list using this component
         /// </summary>
-        public List<Product> Products { get; set; }
+        public IList<Product> Products { get; set; }
     }
 }
