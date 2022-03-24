@@ -14,12 +14,16 @@ namespace ComponentsGuidExtractor.ClassLibrary
 {
     public static class ComponentGuidFinder
     {
-        public static Dictionary<string, List<Component>> FindComponentGuids(string componentsRoot, List<string> list, SearchType searchType)
+        const string componentsRoot = @"SOFTWARE\Microsoft\Windows\CurrentVersion\Installer\UserData\S-1-5-18\Components";
+        const string productsRoot = @"SOFTWARE\Microsoft\Windows\CurrentVersion\Installer\UserData\S-1-5-18\Products";
+        const string sharedDllsRoot = @"SOFTWARE\Microsoft\Windows\CurrentVersion\SharedDLLs";
+
+        public static Dictionary<string, List<Component>> FindComponentGuids(List<string> list, SearchType searchType)
         {
-            return SortComponentGuidDictionary(FindComponents(componentsRoot, list, searchType));
+            return SortAndFormatComponentGuidDictionary(FindComponents(list, searchType));
         }
 
-        private static Dictionary<string, List<Component>> FindComponents(string componentsRoot, List<string> list, SearchType searchType)
+        private static Dictionary<string, List<Component>> FindComponents(List<string> list, SearchType searchType)
         {
             Dictionary<string, List<Component>> fileComponentsDictionary = new();
 
@@ -36,10 +40,11 @@ namespace ComponentsGuidExtractor.ClassLibrary
                     localMachine = Registry.LocalMachine;
                 }
 
+                RegistryKey products = localMachine.OpenSubKey(productsRoot);
                 RegistryKey components = localMachine.OpenSubKey(componentsRoot);
+                RegistryKey sharedDlls = Registry.LocalMachine.OpenSubKey(sharedDllsRoot);
+
                 string[] componentIds = components.GetSubKeyNames();
-
-
 
                 foreach (var componentId in componentIds)
                 {
@@ -51,6 +56,7 @@ namespace ComponentsGuidExtractor.ClassLibrary
                         if (!string.IsNullOrWhiteSpace(productId))
                         {
                             var valueData = (string)componentKey.GetValue(productId);
+                            string productName = string.Empty;
 
                             if (string.IsNullOrWhiteSpace(valueData)) { continue; }
 
@@ -70,7 +76,13 @@ namespace ComponentsGuidExtractor.ClassLibrary
 
                             if (!string.IsNullOrWhiteSpace(matchedFile))
                             {
+                                RegistryKey productProperties = null;
+                                int sharedDllRefCount;
 
+                                productProperties = products.OpenSubKey(productId + @"\InstallProperties");
+                                
+                                sharedDllRefCount = (int)(sharedDlls.GetValue(valueData.Replace("?", "")) ?? sharedDlls.GetValue(valueData.Replace("?", "").Replace("SysWOW64", "system32", StringComparison.OrdinalIgnoreCase)) ?? 0);
+                                
                                 if (!fileComponentsDictionary.TryGetValue(matchedFile, out List<Component> existingComponentList))
                                 {
                                     // Create if not exists in dictionary
@@ -89,7 +101,21 @@ namespace ComponentsGuidExtractor.ClassLibrary
                                     existingComponentList.Add(existingComponent);
                                 }
 
-                                existingComponent.Products.Add(new Product { ProductGuid = productId, Value = valueData });
+                                if (productProperties != null)
+                                {
+                                    productName = productProperties.GetValue("DisplayName")?.ToString();
+
+                                    if (productName == null)
+                                    {
+                                        System.Diagnostics.Debugger.Break();
+                                    }
+                                }
+                                else
+                                {
+                                    productName = "";
+                                }
+
+                                existingComponent.Products.Add(new Product { ProductGuid = productId, ProductName = productName, FilePath = valueData, SharedDllRefCount = sharedDllRefCount });
                             }
                         }
                     }
@@ -99,9 +125,9 @@ namespace ComponentsGuidExtractor.ClassLibrary
             return fileComponentsDictionary;
         }
 
-        private static Dictionary<string, List<Component>> SortComponentGuidDictionary(Dictionary<string, List<Component>> componentGuidDict)
+        private static Dictionary<string, List<Component>> SortAndFormatComponentGuidDictionary(Dictionary<string, List<Component>> componentGuidDict)
         {
-            if (componentGuidDict?.Count > 0)
+            if (componentGuidDict != null && componentGuidDict.Count > 0)
             {
                 foreach (var key in componentGuidDict.Keys)
                 {
@@ -109,10 +135,17 @@ namespace ComponentsGuidExtractor.ClassLibrary
                     {
                         component.ComponentGuid = component.ComponentGuid.FormatGuid();
 
+                        SortedList<string, Product> Products;
+
+                        Products = new SortedList<string, Product>();
+
                         foreach (var product in component.Products)
                         {
                             product.ProductGuid = product.ProductGuid.FormatGuid();
+                            Products.Add(product.ProductGuid, product);
                         }
+
+                        component.Products = Products.Values;
                     }
                 }
             }
